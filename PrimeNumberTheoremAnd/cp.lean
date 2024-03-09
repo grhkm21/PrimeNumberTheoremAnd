@@ -1,4 +1,5 @@
 import PrimeNumberTheoremAnd.Std.Data.Nat.Gcd
+import Mathlib.Data.Nat.Factorization.PrimePow
 import Mathlib.NumberTheory.VonMangoldt
 
 open Nat hiding log
@@ -28,7 +29,67 @@ lemma mul_coprime_divisors_equiv {m n : ℕ} (h : m.Coprime n) (hm : m ≠ 0) (h
     · rw [Nat.gcd_comm, Coprime.gcd_mul _ this]
       rw [h.symm.coprime_dvd_right hm', Nat.gcd_eq_right hn', one_mul]
 
+lemma IsPrimePow.eq_of_dvd_dvd {p q n : ℕ}
+    (hn : IsPrimePow n) (hp' : p.Prime) (hq' : q.Prime) (hp : p ∣ n) (hq : q ∣ n) : p = q := by
+  obtain ⟨r, k, hr, hk, rfl⟩ := hn
+  rw [← prime_iff] at hr
+  rw [Nat.dvd_prime_pow hr] at hp hq
+  have : p = r := by obtain ⟨k', _, rfl⟩ := hp; exact hr.pow_eq_iff.mpr ⟨rfl, hp'.eq_one_of_pow⟩
+  have : q = r := by obtain ⟨k', _, rfl⟩ := hq; exact hr.pow_eq_iff.mpr ⟨rfl, hq'.eq_one_of_pow⟩
+  simp [*]
+
+lemma not_IsPrimePow_iff_exists_primes_dvd {n : ℕ} (hn : 1 < n) :
+    ¬IsPrimePow n ↔ ∃ p q, p.Prime ∧ q.Prime ∧ p ≠ q ∧ p ∣ n ∧ q ∣ n := by
+  constructor
+  · intro h
+    rw [isPrimePow_iff_minFac_pow_factorization_eq (by linarith)] at h
+    let p := n.minFac
+    have hp₁ := minFac_prime hn.ne.symm
+    have hp₂ := minFac_dvd n
+    let v := n.factorization p
+    have hv : p ^ v ∣ n := ord_proj_dvd n _
+    let q := (ord_compl[p] n).minFac
+    have : ord_compl[p] n ≠ 1 := fun h' ↦ h (eq_of_dvd_of_div_eq_one hv h')
+    have hq₁ := minFac_prime this
+    have hq₂ := minFac_dvd (n / p)
+    use p, q, hp₁, hq₁, ?_, hp₂, (n / q)
+    · refine Nat.eq_mul_of_div_eq_right ?_ rfl
+      trans ord_compl[p] n
+      · exact minFac_dvd _
+      · exact ord_compl_dvd n p
+    · by_contra!
+      simp only at this hq₂
+      have : n.minFac ∣ n / n.minFac ^ n.factorization n.minFac := by
+        nth_rw 1 [this]
+        apply minFac_dvd
+      exact (pow_succ_factorization_not_dvd (by linarith) hp₁) $ mul_dvd_of_dvd_div hv this
+  · intro ⟨p, q, hp_prime, hq_prime, hpq, hp, hq⟩
+    by_contra!
+    exact hpq $ this.eq_of_dvd_dvd hp_prime hq_prime hp hq
+
+lemma Squarefree.dvd_self_div_of_sq_dvd {p n d : ℕ}
+    (hd : Squarefree d) (hp : p ^ 2 ∣ n) (hd' : d ∣ n) : p ∣ n / d := by
+  by_cases hp' : p = 1
+  /- Simple case -/
+  · simp only [hp', one_dvd]
+  /- The other case -/
+  obtain ⟨n', hn'⟩ := hp
+  subst hn'
+  by_cases hd' : d ∣ p * n'
+  · use (p * n' / d)
+    rw [← Nat.mul_div_assoc _ hd', ← mul_assoc, sq]
+  · exfalso
+    apply hd'; clear hd'
+    obtain ⟨d1, d2, h1, h2, rfl⟩:= Nat.dvd_mul.mp hd'
+    apply mul_dvd_mul ?_ h2
+    rwa [← Squarefree.dvd_pow_iff_dvd hd.of_mul_left two_ne_zero]
+
+set_option push_neg.use_distrib true
 example {n : ℕ} : (μ * Λ) n = -μ n * log n := by
+  /- case on n = 0 -/
+  rcases Nat.eq_zero_or_pos n with rfl | hn₀
+  · simp only [ArithmeticFunction.map_zero, mul_zero]
+  /- remaining case -/
   by_cases hn : Squarefree n
   · sorry
   /- · have h_id₁ {d : ℕ} (hd : d ∈ n.divisors) : μ n = μ d * μ (n / d) := by -/
@@ -78,27 +139,15 @@ example {n : ℕ} : (μ * Λ) n = -μ n * log n := by
       congr ; ext d
       rw [mul_ne_zero_iff]
       simp [moebius_ne_zero_iff_squarefree, vonMangoldt_eq_zero_iff]
-    · by_cases hn' : ∃ p q, p ≠ q ∧ p.Prime ∧ q.Prime ∧ p ^ 2 ∣ n ∧ q ^ 2 ∣ n
-      /- If n is divisible by two prime squares, then n / p^k is never squarefree -/
-      · convert sum_empty
-        refine eq_empty_iff_forall_not_mem.mpr (fun d hd ↦ ?_)
-        rw [mem_filter] at hd
-      /- Otherwise, we can still evaluate the sum :) -/
-      · have : ∃ p n₀, p.Prime ∧ Squarefree n₀ ∧ p.Coprime n₀ ∧ ∃ m, n = p ^ m * n₀ := by
-          sorry
-        obtain ⟨p, n₀, h⟩ := this
-        obtain ⟨m, hm⟩ := h.right.right.right
-        save
-        have : n.divisors ≃ (p ^ m).divisors ×ˢ n₀.divisors := by
-          rw [hm]
-          apply mul_coprime_divisors_equiv
-          · exact Coprime.pow_left _ h.right.right.left
-          · apply IsPrimePow.ne_zero
-            use p, m, prime_iff.mp h.left, ?_
-            by_contra! hm'
-            rw [nonpos_iff_eq_zero.mp hm', Nat.pow_zero, one_mul] at hm
-            rw [hm] at hn
-            tauto
-          · exact fun hn₀ ↦ not_squarefree_zero (hn₀ ▸ h.right.left)
-
-example : ¬Squarefree 0 := by exact?
+    · obtain ⟨a, b, ha, hb, rfl, ha'⟩ := sq_mul_squarefree_of_pos hn₀
+      replace hb : 1 < b := by
+        contrapose! hn
+        rcases (show b = 1 by omega) with rfl
+        rwa [one_pow, one_mul]
+      clear hn
+      by_cases hb' : IsPrimePow b
+      · done
+      · apply sum_congr (s₂ := ∅) ?_ (fun _ _ ↦ rfl)
+        ext d
+        simp only [not_mem_empty, iff_false, mem_filter, not_and, mem_divisors]
+        intro hd_dvd hd_sqf
