@@ -38,7 +38,7 @@ lemma IsPrimePow.eq_of_dvd_dvd {p q n : ℕ}
   have : q = r := by obtain ⟨k', _, rfl⟩ := hq; exact hr.pow_eq_iff.mpr ⟨rfl, hq'.eq_one_of_pow⟩
   simp [*]
 
-lemma not_IsPrimePow_iff_exists_primes_dvd {n : ℕ} (hn : 1 < n) :
+lemma not_isPrimePow_iff_exists_primes_dvd {n : ℕ} (hn : 1 < n) :
     ¬IsPrimePow n ↔ ∃ p q, p.Prime ∧ q.Prime ∧ p ≠ q ∧ p ∣ n ∧ q ∣ n := by
   constructor
   · intro h
@@ -146,8 +146,37 @@ example {n : ℕ} : (μ * Λ) n = -μ n * log n := by
         rwa [one_pow, one_mul]
       clear hn
       by_cases hb' : IsPrimePow b
-      · done
+      · sorry
       · apply sum_congr (s₂ := ∅) ?_ (fun _ _ ↦ rfl)
         ext d
         simp only [not_mem_empty, iff_false, mem_filter, not_and, mem_divisors]
         intro hd_dvd hd_sqf
+        obtain ⟨p, q, hp, hq, hpq, hpb, hqb⟩ := (not_isPrimePow_iff_exists_primes_dvd hb).mp hb'
+        obtain ⟨b', rfl⟩ := Prime.dvd_mul_of_dvd_ne hpq hp hq hpb hqb
+        have : ¬(p * q) ^ 2 ∣ d := by
+          contrapose! hd_sqf
+          simp [Squarefree]
+          use p * q, sq (p * q) ▸ hd_sqf
+          linarith only [one_lt_mul'' hp.one_lt hq.one_lt]
+        have : p * q ∣ (p * q * b') ^ 2 * a / d := by
+          have hp' : p ∣ (p * q * b') ^ 2 * a / d :=
+             Squarefree.dvd_self_div_of_sq_dvd hd_sqf ⟨(q * b') ^ 2 * a, by ring⟩ hd_dvd.left
+          have hq' : q ∣ (p * q * b') ^ 2 * a / d :=
+             Squarefree.dvd_self_div_of_sq_dvd hd_sqf ⟨(p * b') ^ 2 * a, by ring⟩ hd_dvd.left
+          exact Prime.dvd_mul_of_dvd_ne hpq hp hq hp' hq'
+        rw [not_isPrimePow_iff_exists_primes_dvd]
+        use p, q, hp, hq, hpq
+        exact ⟨(dvd_mul_right _ _).trans this, (dvd_mul_left _ _).trans this⟩
+        set X := (p * q * b') ^ 2 * a / d with hX
+        have hX₀ : X ≠ 0 := by
+          have : 0 < d := by by_contra!; simp only [le_zero.mp this, not_squarefree_zero] at hd_sqf
+          rw [Nat.ne_zero_iff_zero_lt]
+          exact (Nat.lt_div_iff_mul_lt hd_dvd.left 0).mpr hn₀
+        have hX₁ : X ≠ 1 := by
+          contrapose! hd_sqf
+          obtain ⟨rfl⟩ := eq_of_dvd_of_div_eq_one hd_dvd.left hd_sqf
+          simp [Squarefree]
+          use p, (by use (q * b') ^ 2 * a, by ring), hp.ne_one
+        exact one_lt_iff_ne_zero_and_ne_one.mpr ⟨hX₀, hX₁⟩
+
+/- rwa [← hn.of_mul_left.dvd_pow_iff_dvd two_ne_zero] -/
