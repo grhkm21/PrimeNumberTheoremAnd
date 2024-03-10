@@ -190,49 +190,105 @@ example {n : ℕ} : (μ * Λ) n = -μ n * log n := by
       by_cases hb' : IsPrimePow b
       · obtain ⟨p, k, hp_prime, hk_pos, rfl⟩ := hb'
         rw [← prime_iff] at hp_prime
-        have : ∃ k' a', (p ^ k) ^ 2 * a = p ^ k' * a' ∧ 2 ≤ k' ∧ Coprime p a' := by
-          use 2 * k + a.factorization p, ord_compl[p] a, ?_, by linarith, ?_
-          · ring_nf; rw [mul_assoc, ord_proj_mul_ord_compl_eq_self]
+        have : ∃ k' a',
+            (p ^ k) ^ 2 * a = p ^ k'.succ * a' ∧ 1 ≤ k' ∧ Coprime p a' ∧ Squarefree a' := by
+          use 2 * k + a.factorization p - 1, ord_compl[p] a, ?_, by omega, ?_
+          · exact ha'.squarefree_of_dvd $ ord_compl_dvd a p
+          · rw [succ_eq_add_one, Nat.sub_add_cancel (by omega), pow_add, mul_assoc,
+              ord_proj_mul_ord_compl_eq_self]
+            ring_nf
           · exact coprime_ord_compl hp_prime ha.ne.symm
-        obtain ⟨k, a, hhhh, hk_two_le, ha_coprime⟩ := this; simp only [hhhh] at *; clear hhhh
-        have ha_coprime' := ha_coprime.pow_left k
+        obtain ⟨k, a, hhhh, hk_one_le, ha_coprime, ha_sqf⟩ := this
+        simp only [hhhh] at *; clear hhhh
+        have ha_coprime' := ha_coprime.pow_left k.succ
         have ha_dvd : ¬p ∣ a := by
           contrapose! ha_coprime
           obtain ⟨k, rfl⟩ := ha_coprime
           simp [hp_prime.ne_one]
-        have : ∀ d ∈ (p ^ k * a).divisors.filter fun d ↦ IsPrimePow d ∧ Squarefree (p ^ k * a / d),
-            p ∣ d := by
-          /- intro d hd -/
-          /- obtain ⟨hd, hd_pp, hd_sqf⟩ := mem_filter.mp hd -/
-          /- obtain ⟨hd_dvd, hd_ne_zero⟩ := mem_divisors.mp hd -/
-          /- obtain ⟨q, k', hq_prime, hk'_pos, rfl⟩ := hd_pp -/
-          /- rw [← prime_iff] at hq_prime -/
-          /- suffices p = q by subst this; apply dvd_pow dvd_rfl hk'_pos.ne.symm -/
-          /- have hq_dvd := hq_prime.dvd_mul.mp $ (dvd_pow dvd_rfl hk'_pos.ne.symm).trans hd_dvd -/
-          /- cases' hq_dvd with hq_dvd hq_dvd -/
-          /- · refine ((Nat.prime_dvd_prime_iff_eq hq_prime hp_prime).mp ?_).symm -/
-          /-   exact hq_prime.dvd_of_dvd_pow hq_dvd -/
-          /- · have : ¬p ∣ q := by -/
-          /-     contrapose! ha_coprime with hpq -/
-          /-     obtain ⟨k, rfl⟩ := hpq.trans hq_dvd -/
-          /-     simp [hp_prime.ne_one] -/
-          /-   have : p ^ k ∣ p ^ k * a / q ^ k' := by -/
-          /-     rw [Nat.mul_div_assoc] -/
-          /-     · apply dvd_mul_right -/
-          /-     · have h' := pow hq_prime.isPrimePow hk'_pos.ne.symm -/
-          /-       have h' := (ha_coprime'.isPrimePow_dvd_mul h').mp hd_dvd -/
-          /-       cases' h' with h' -/
-          /-       · exfalso -/
-          /-         replace h' := hq_prime.dvd_of_dvd_pow $ (dvd_pow dvd_rfl hk'_pos.ne.symm).trans h' -/
-          /-         replace h' := (Nat.prime_dvd_prime_iff_eq hq_prime hp_prime).mp h' -/
-          /-         exact (Nat.prime_dvd_prime_iff_eq hp_prime hq_prime).not.mp this h'.symm -/
-          /-       · assumption -/
-          /-   absurd hd_sqf -/
-          /-   simp [Squarefree] -/
-          /-   use p, (sq p ▸ Nat.pow_dvd_pow p hk_two_le).trans this, hp_prime.ne_one -/
-          sorry
-        sorry
-      · apply sum_congr (s₂ := ∅) ?_ (fun _ _ ↦ rfl)
-        ext d
-        simp only [not_mem_empty, iff_false, mem_filter, mem_divisors, not_and]
-        sorry
+        have : ∀ d ∈ (p ^ k.succ * a).divisors.filter fun d ↦
+            IsPrimePow d ∧ Squarefree (p ^ k.succ * a / d), p ^ k ∣ d := by
+          intro d hd
+          obtain ⟨hd, hd_pp, hd_sqf⟩ := mem_filter.mp hd
+          obtain ⟨hd_dvd, hd_ne_zero⟩ := mem_divisors.mp hd
+          obtain ⟨q, k', hq_prime, hk'_pos, rfl⟩ := hd_pp
+          rw [← prime_iff] at hq_prime
+          have : p = q := by
+            have hdvd_pow {x : ℕ} := dvd_pow (dvd_rfl (a := x)) hk'_pos.ne.symm
+            have hq_dvd := hq_prime.dvd_mul.mp $ hdvd_pow.trans hd_dvd
+            cases' hq_dvd with hq_dvd hq_dvd
+            · refine ((Nat.prime_dvd_prime_iff_eq hq_prime hp_prime).mp ?_).symm
+              exact hq_prime.dvd_of_dvd_pow hq_dvd
+            · have : ¬p ∣ q := by
+                contrapose! ha_coprime with hpq
+                obtain ⟨k, rfl⟩ := hpq.trans hq_dvd
+                simp [hp_prime.ne_one]
+              have : p ^ k.succ ∣ p ^ k.succ * a / q ^ k' := by
+                rw [Nat.mul_div_assoc]
+                · apply dvd_mul_right
+                · have h' := pow hq_prime.isPrimePow hk'_pos.ne.symm
+                  have h' := (ha_coprime'.isPrimePow_dvd_mul h').mp hd_dvd
+                  cases' h' with h'
+                  · exfalso
+                    replace h' := hq_prime.dvd_of_dvd_pow $ hdvd_pow.trans h'
+                    replace h' := (Nat.prime_dvd_prime_iff_eq hq_prime hp_prime).mp h'
+                    exact (Nat.prime_dvd_prime_iff_eq hp_prime hq_prime).not.mp this h'.symm
+                  · assumption
+              absurd hd_sqf
+              simp [Squarefree]
+              use p, (sq p ▸ pow_dvd_pow _ (show 2 ≤ k.succ by omega)).trans this, hp_prime.ne_one
+          subst this
+          rw [pow_dvd_pow_iff_le_right hp_prime.one_lt]
+          have hd_fact := hd_sqf.natFactorization_le_one p
+          have h := mul_ne_zero_iff.mp hd_ne_zero
+          rw [Nat.factorization_div hd_dvd, Nat.factorization_mul h.left h.right] at hd_fact
+          simp [hp_prime.factorization_self, factorization_eq_zero_of_not_dvd ha_dvd] at hd_fact
+          omega
+        have : (p ^ k.succ * a).divisors.filter (fun d ↦
+            IsPrimePow d ∧ Squarefree (p ^ k.succ * a / d)) = ({p ^ k, p ^ k.succ} : Finset ℕ) := by
+          ext d
+          constructor <;> intro hd
+          · have hd₁ := this d hd
+            rw [mem_filter, mem_divisors] at hd
+            have hd₂ : d ∣ p ^ k.succ := by
+              have := (dvd_pow dvd_rfl (by omega)).trans hd₁
+              have := fun h'' ↦ ha_dvd $ this.trans h''
+              have := (ha_coprime'.isPrimePow_dvd_mul hd.right.left).mp hd.left.left
+              tauto
+            obtain ⟨k', rfl⟩ := hd₁
+            have : k' ∣ p := by
+              convert dvd_div_of_mul_dvd hd₂
+              rw [Nat.pow_div _ hp_prime.pos, succ_sub, Nat.sub_self, pow_one]
+              all_goals omega
+            have : k' = 1 ∨ k' = p := (dvd_prime hp_prime).mp this
+            rcases this with rfl | rfl
+            · simp
+            · have : succ (k - 1) = k := by omega
+              simp [← Nat.pow_succ, this]
+          · simp at hd ⊢
+            rcases hd with rfl | rfl
+            <;> simp [hp_prime.ne_zero, (mul_ne_zero_iff.mp hn₀.ne.symm).right]
+            · simp [Nat.pow_succ, mul_assoc, dvd_mul_right]
+              constructor
+              · use p, k, prime_iff.mp hp_prime, hk_one_le
+              · rw [mul_div_right]
+                · exact (squarefree_mul ha_coprime).mpr ⟨hp_prime.squarefree, ha_sqf⟩
+                · exact pow_pos hp_prime.pos _
+            · constructor
+              · use p, k.succ, prime_iff.mp hp_prime, succ_pos _
+              · rwa [mul_div_right]
+                exact pow_pos hp_prime.pos _
+        rw [this, sum_insert, sum_singleton, vonMangoldt_apply_pow, vonMangoldt_apply_pow]
+        · save
+          rw [Nat.mul_div_cancel_left, Nat.pow_succ, mul_assoc, Nat.mul_div_cancel_left]
+          · rw [isMultiplicative_moebius.map_mul_of_coprime ha_coprime,
+              moebius_apply_prime hp_prime]
+            simp
+          · exact pow_pos hp_prime.pos _
+          · exact pow_pos hp_prime.pos _
+        · simp
+        · omega
+        · simp
+          have := Nat.pow_right_injective hp_prime.two_le
+          specialize @this k k.succ
+          simpa [(Nat.succ_ne_self k).symm, this]
+      · sorry
