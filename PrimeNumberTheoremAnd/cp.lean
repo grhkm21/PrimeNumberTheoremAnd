@@ -127,60 +127,58 @@ example {n : ℕ} : (μ * Λ) n = -μ n * log n := by
   · simp only [ArithmeticFunction.map_zero, mul_zero]
   /- remaining case -/
   by_cases hn : Squarefree n
-  · sorry
-  /- · have h_id₁ {d : ℕ} (hd : d ∈ n.divisors) : μ n = μ d * μ (n / d) := by -/
-  /-     have := Nat.mul_div_cancel' $ dvd_of_mem_divisors hd -/
-  /-     rw [← (isMultiplicative_moebius).right, this] -/
-  /-     exact Nat.coprime_of_squarefree_mul (this.symm ▸ hn) -/
-  /-   have h_id₂ {d : ℕ} (hd : d ∈ n.divisors) : μ d * Λ d = -Λ d := by -/
-  /-     by_cases hd : IsPrimePow d -/
-  /-     · obtain ⟨p, k, ⟨hp, hd'⟩⟩ := hd -/
-  /-       rw [← Nat.prime_iff] at hp -/
-  /-       rw [← hd'.right, moebius_apply_prime_pow hp $ Nat.pos_iff_ne_zero.mp hd'.left] -/
-  /-       split_ifs with hk -/
-  /-       · norm_num -/
-  /-       · have : Squarefree _ := hd'.right.symm ▸ squarefree_of_dvd (dvd_of_mem_divisors hd) hn -/
-  /-         have : k = 0 ∨ k = 1 := eq_zero_or_one_of_pow_of_not_isUnit this hp.not_unit -/
-  /-         omega -/
-  /-     · simp only [vonMangoldt_apply, hd, if_false, mul_zero, neg_zero] -/
-  /-   symm -/
-  /-   rw [neg_mul, neg_eq_iff_eq_neg] -/
-  /-   /- My first long calc proof! -/ -/
-  /-   calc μ n * log n -/
-  /-     _ = ∑ d in n.divisors, Λ d * μ n := by -/
-  /-       rw [← sum_mul, vonMangoldt_sum, mul_comm] ; rfl -/
-  /-     _ = ∑ d in n.divisors, Λ (n / d) * μ n := by -/
-  /-       rw [← sum_div_divisors] -/
-  /-     _ = ∑ d in n.divisors, Λ (n / d) * μ (n / d) * μ d := by -/
-  /-       refine sum_congr rfl (fun d hd ↦ ?_) -/
-  /-       rw [h_id₁ hd, mul_assoc, mul_comm (μ d)] -/
-  /-       norm_cast -/
-  /-     _ = -∑ d in n.divisors, Λ (n / d) * μ d := by -/
-  /-       rw [← sum_neg_distrib] -/
-  /-       refine sum_congr rfl (fun d hd ↦ ?_) -/
-  /-       have hd' : n / d ∈ n.divisors := by -/
-  /-         rw [mem_divisors] at hd ⊢ -/
-  /-         exact ⟨div_dvd_of_dvd hd.left, hd.right⟩ -/
-  /-       rw [mul_comm (Λ _), h_id₂ hd', neg_mul] -/
-  /-     _ = -∑ d in n.divisors, μ d * Λ (n / d) := by -/
-  /-       simp_rw [mul_comm] -/
-  /-     _ = -(μ * Λ) n := by -/
-  /-       rw [mul_apply, ← map_div_right_divisors, sum_map, Function.Embedding.coeFn_mk] -/
-  /-       rfl -/
+  · have h_id₁ {d : ℕ} (hd : d ∈ n.divisors) : μ n = μ d * μ (n / d) := by
+      have := Nat.mul_div_cancel' $ dvd_of_mem_divisors hd
+      rw [← (isMultiplicative_moebius).right, this]
+      exact Nat.coprime_of_squarefree_mul (this.symm ▸ hn)
+    have h_id₂ {d : ℕ} (hd : d ∈ n.divisors) : μ d * Λ d = -Λ d := by
+      by_cases hd : IsPrimePow d
+      · obtain ⟨p, k, ⟨hp, hd'⟩⟩ := hd
+        rw [← Nat.prime_iff] at hp
+        rw [← hd'.right, moebius_apply_prime_pow hp $ Nat.pos_iff_ne_zero.mp hd'.left]
+        split_ifs with hk
+        · norm_num
+        · have : Squarefree _ := hd'.right.symm ▸ squarefree_of_dvd (dvd_of_mem_divisors hd) hn
+          have : k = 0 ∨ k = 1 := eq_zero_or_one_of_pow_of_not_isUnit this hp.not_unit
+          omega
+      · simp only [vonMangoldt_apply, hd, if_false, mul_zero, neg_zero]
+    symm
+    rw [neg_mul, neg_eq_iff_eq_neg]
+    /- My first long calc proof! -/
+    calc μ n * log n
+      _ = ∑ d in n.divisors, Λ d * μ n := by
+        rw [← sum_mul, vonMangoldt_sum, mul_comm] ; rfl
+      _ = ∑ d in n.divisors, Λ (n / d) * μ n := by
+        rw [← sum_div_divisors]
+      _ = ∑ d in n.divisors, Λ (n / d) * μ (n / d) * μ d := by
+        refine sum_congr rfl (fun d hd ↦ ?_)
+        rw [h_id₁ hd, mul_assoc, mul_comm (μ d)]
+        norm_cast
+      _ = -∑ d in n.divisors, Λ (n / d) * μ d := by
+        rw [← sum_neg_distrib]
+        refine sum_congr rfl (fun d hd ↦ ?_)
+        have hd' : n / d ∈ n.divisors := by
+          rw [mem_divisors] at hd ⊢
+          exact ⟨div_dvd_of_dvd hd.left, hd.right⟩
+        rw [mul_comm (Λ _), h_id₂ hd', neg_mul]
+      _ = -∑ d in n.divisors, μ d * Λ (n / d) := by
+        simp_rw [mul_comm]
+      _ = -(μ * Λ) n := by
+        rw [mul_apply, ← map_div_right_divisors, sum_map, Function.Embedding.coeFn_mk]
+        rfl
   · simp only [mul_apply, ← map_div_right_divisors, sum_map, Function.Embedding.coeFn_mk]
     rw [moebius_eq_zero_of_not_squarefree hn, Int.cast_zero, neg_zero, zero_mul]
     trans ∑ d in n.divisors.filter fun d ↦ IsPrimePow d ∧ Squarefree (n / d), Λ d * μ (n / d)
-    /- · rw [← sum_div_divisors] -/
-    /-   rw [sum_congr rfl (g := fun d ↦ Λ d * μ (n / d)) (fun d hd ↦ by -/
-    /-     rw [Nat.div_div_self ?_ hn₀.ne.symm, mul_comm] -/
-    /-     rfl; exact (mem_divisors.mp hd).left -/
-    /-   )] -/
-    /-   rw [← sum_filter_ne_zero] -/
-    /-   refine sum_congr ?_ (fun _ _ ↦ rfl) -/
-    /-   congr ; ext d -/
-    /-   rw [mul_ne_zero_iff] -/
-    /-   simp [moebius_ne_zero_iff_squarefree, vonMangoldt_eq_zero_iff] -/
-    · sorry
+    · rw [← sum_div_divisors]
+      rw [sum_congr rfl (g := fun d ↦ Λ d * μ (n / d)) (fun d hd ↦ by
+        rw [Nat.div_div_self ?_ hn₀.ne.symm, mul_comm]
+        rfl; exact (mem_divisors.mp hd).left
+      )]
+      rw [← sum_filter_ne_zero]
+      refine sum_congr ?_ (fun _ _ ↦ rfl)
+      congr ; ext d
+      rw [mul_ne_zero_iff]
+      simp [moebius_ne_zero_iff_squarefree, vonMangoldt_eq_zero_iff]
     · obtain ⟨a, b, ha, hb, rfl, ha'⟩ := sq_mul_squarefree_of_pos hn₀
       replace hb : 1 < b := by
         contrapose! hn
@@ -291,4 +289,27 @@ example {n : ℕ} : (μ * Λ) n = -μ n * log n := by
           have := Nat.pow_right_injective hp_prime.two_le
           specialize @this k k.succ
           simpa [(Nat.succ_ne_self k).symm, this]
-      · sorry
+      · /- It suffices to prove the filtered set is empty -/
+        apply sum_congr (s₂ := ∅) ?_ fun _ _ ↦ rfl
+        ext d
+        simp [not_or]
+        obtain ⟨p, q, hp_prime, hq_prime, hpq, hp_dvd, hq_dvd⟩ :=
+          (not_isPrimePow_iff_exists_primes_dvd hb).mp hb'
+        /- If p^2q^2 | b, then b / d cannot be a prime power for a squarefree d -/
+        intro hd_dvd hb_zero ha_zero hd_pp h_sqf
+        have hp₁ : 2 ≤ (b ^ 2 * a).factorization p := by
+          rw [Nat.factorization_mul (pow_ne_zero _ hb_zero) ha_zero, Nat.factorization_pow]
+          simp
+          have := (hp_prime.dvd_iff_one_le_factorization hb_zero).mp hp_dvd
+          omega
+        have hq₁ : 2 ≤ (b ^ 2 * a).factorization q := by
+          rw [Nat.factorization_mul (pow_ne_zero _ hb_zero) ha_zero, Nat.factorization_pow]
+          simp
+          have := (hq_prime.dvd_iff_one_le_factorization hb_zero).mp hq_dvd
+          omega
+        have hp₂ : (b ^ 2 * a / d).factorization p ≤ 1 := h_sqf.natFactorization_le_one p
+        have hq₂ : (b ^ 2 * a / d).factorization q ≤ 1 := h_sqf.natFactorization_le_one q
+        simp [factorization_div hd_dvd] at hp₂ hq₂
+        have hp_dvd' := (hp_prime.dvd_iff_one_le_factorization hd_pp.ne_zero).mpr (by linarith)
+        have hq_dvd' := (hq_prime.dvd_iff_one_le_factorization hd_pp.ne_zero).mpr (by linarith)
+        exact hpq $ hd_pp.eq_of_dvd_dvd hp_prime hq_prime hp_dvd' hq_dvd'
