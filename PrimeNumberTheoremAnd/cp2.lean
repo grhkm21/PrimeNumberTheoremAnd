@@ -4,6 +4,10 @@ variable {R : Type*}
 
 /- TODO: Relax this (it should be defined in each section/lemma) -/
 variable [hR : CommRing R]
+/- This is needed because `isUnit_zero_iff` exists -/
+variable [NeZero (1 : R)]
+/- This is needed for all invertibility results -/
+variable [DecidablePred (@IsUnit R _)]
 
 namespace ArithmeticFunction
 
@@ -26,40 +30,40 @@ scoped[ArithmeticFunction] notation "φ" => totient
 
 scoped[ArithmeticFunction.Totient] notation "φ" => totient
 
-theorem coe_moebius_mul_coe_id : (μ : ArithmeticFunction R) * id = (φ : ArithmeticFunction R) := by
-  ext n
-  induction n using Nat.recOnPosPrimePosCoprime with
-  | hp p k hp_prime hk_pos =>
-    rw [totient_apply, totient_prime_pow hp_prime hk_pos, mul_apply,
-      sum_divisorsAntidiagonal ((μ : ArithmeticFunction R) · * (id : ArithmeticFunction R) ·),
-      divisors_prime_pow hp_prime, sum_map]
-    simp
-    rw [cast_sub hp_prime.one_le, cast_one, mul_sub, mul_one, mul_comm, ← _root_.pow_succ,
-      Nat.sub_add_cancel hk_pos]
-    calc ∑ x in range (k + 1), (μ (p ^ x) : R) * (p ^ k / p ^ x : R)
-      _ = (μ (p ^ 0) : R) * (p ^ (k - 0) : R) + (μ (p ^ 1) : R) * (p ^ (k - 1) : R) +
-          ∑ x in Icc 2 k, (μ (p ^ x) : R) * (p ^ k / p ^ x : R) := by
-        rw [range_eq_Ico, ← Ico_insert_succ_left, sum_insert, ← Ico_insert_succ_left, sum_insert,
-          Ico_succ_right]
-        · simp [add_assoc]
-          nth_rw 1 [← Nat.sub_add_cancel hk_pos, pow_add, pow_one,
-            Nat.mul_div_cancel _ hp_prime.pos, cast_pow]
-        all_goals simp [mem_Ico, hk_pos]
-      _ = (μ (p ^ 0) : R) * (p ^ (k - 0) : R) + (μ (p ^ 1) : R) * (p ^ (k - 1) : R) := by
-        rw [add_right_eq_self]
-        refine sum_eq_zero fun d hd ↦ ?_
-        rw [mem_Icc] at hd
-        simp [moebius_apply_prime_pow hp_prime (by omega : d ≠ 0)]
-        exact fun hd' ↦ by omega
-      _ = p ^ k - p ^ (k - 1) := by
-        simp [moebius_apply_prime hp_prime, ← sub_eq_add_neg]
-  | h0 => simp
-  | h1 => simp
-  | h m n _ _ hmn hm' hn' =>
-    have : IsMultiplicative ((μ : ArithmeticFunction R) * (id : ArithmeticFunction R)) := by
-      arith_mult
-    rw [this.right hmn, hm', hn', isMultiplicative_totient.right hmn]
-
+/- theorem coe_moebius_mul_coe_id : (μ : ArithmeticFunction R) * id = (φ : ArithmeticFunction R) := by -/
+/-   ext n -/
+/-   induction n using Nat.recOnPosPrimePosCoprime with -/
+/-   | hp p k hp_prime hk_pos => -/
+/-     rw [totient_apply, totient_prime_pow hp_prime hk_pos, mul_apply, -/
+/-       sum_divisorsAntidiagonal ((μ : ArithmeticFunction R) · * (id : ArithmeticFunction R) ·), -/
+/-       divisors_prime_pow hp_prime, sum_map] -/
+/-     simp -/
+/-     rw [cast_sub hp_prime.one_le, cast_one, mul_sub, mul_one, mul_comm, ← _root_.pow_succ, -/
+/-       Nat.sub_add_cancel hk_pos] -/
+/-     calc ∑ x in range (k + 1), (μ (p ^ x) : R) * (p ^ k / p ^ x : R) -/
+/-       _ = (μ (p ^ 0) : R) * (p ^ (k - 0) : R) + (μ (p ^ 1) : R) * (p ^ (k - 1) : R) + -/
+/-           ∑ x in Icc 2 k, (μ (p ^ x) : R) * (p ^ k / p ^ x : R) := by -/
+/-         rw [range_eq_Ico, ← Ico_insert_succ_left, sum_insert, ← Ico_insert_succ_left, sum_insert, -/
+/-           Ico_succ_right] -/
+/-         · simp [add_assoc] -/
+/-           nth_rw 1 [← Nat.sub_add_cancel hk_pos, pow_add, pow_one, -/
+/-             Nat.mul_div_cancel _ hp_prime.pos, cast_pow] -/
+/-         all_goals simp [mem_Ico, hk_pos] -/
+/-       _ = (μ (p ^ 0) : R) * (p ^ (k - 0) : R) + (μ (p ^ 1) : R) * (p ^ (k - 1) : R) := by -/
+/-         rw [add_right_eq_self] -/
+/-         refine sum_eq_zero fun d hd ↦ ?_ -/
+/-         rw [mem_Icc] at hd -/
+/-         simp [moebius_apply_prime_pow hp_prime (by omega : d ≠ 0)] -/
+/-         exact fun hd' ↦ by omega -/
+/-       _ = p ^ k - p ^ (k - 1) := by -/
+/-         simp [moebius_apply_prime hp_prime, ← sub_eq_add_neg] -/
+/-   | h0 => simp -/
+/-   | h1 => simp -/
+/-   | h m n _ _ hmn hm' hn' => -/
+/-     have : IsMultiplicative ((μ : ArithmeticFunction R) * (id : ArithmeticFunction R)) := by -/
+/-       arith_mult -/
+/-     rw [this.right hmn, hm', hn', isMultiplicative_totient.right hmn] -/
+/-  -/
 end missing
 
 /- ------------------------------------------------------------ -/
@@ -68,26 +72,21 @@ section defining_inverse
 
 open Nat Finset BigOperators
 
-instance {f g : ArithmeticFunction R}
-    [Invertible (f 1)] [Invertible (g 1)] : Invertible ((f * g) 1) := by
-  simp [mul_apply]
-  apply invertibleMul
+variable {f : ArithmeticFunction R}
 
-def invertible (f : ArithmeticFunction R) := IsUnit (f 1)
+noncomputable def inv_leading (f : ArithmeticFunction R) : R :=
+  if hf : IsUnit (f 1) then (hf.unit⁻¹ :) else 0
 
-@[simp]
-noncomputable def inv_leading (f : ArithmeticFunction R) [DecidablePred (@invertible R hR)] : R :=
-  if hf : invertible f then (hf.unit⁻¹ :) else 0
+theorem inv_leading_def (f : ArithmeticFunction R) :
+    f.inv_leading = if hf : IsUnit (f 1) then ((hf.unit⁻¹ : Rˣ) : R) else 0 := by
+  rfl
 
-variable {f : ArithmeticFunction R} [DecidablePred (@invertible R hR)]
+theorem inv_leading_isUnit (hf : IsUnit (f 1)) : f.inv_leading = hf.unit⁻¹ := by
+  simp [inv_leading, hf]
 
-theorem inv_leading_eq_inv (hf : invertible f) : f.inv_leading = hf.unit⁻¹ := by simp [hf]
+theorem inv_leading_not_isUnit (hf : ¬IsUnit (f 1)) : f.inv_leading = 0 := by
+  simp [inv_leading, hf]
 
-theorem inv_leading_mul_map_one (hf : invertible f) : f.inv_leading * f 1 = 1 := by simp [hf]
-
-theorem map_one_mul_inv_leading (hf : invertible f) : f 1 * f.inv_leading = 1 := by simp [hf]
-
-@[simp]
 noncomputable def invFun (f : ArithmeticFunction R) : ℕ → R
 | 0 => 0
 | 1 => f.inv_leading
@@ -95,53 +94,70 @@ noncomputable def invFun (f : ArithmeticFunction R) : ℕ → R
     have := Nat.mem_properDivisors.mp d.prop; f (n / d) * invFun f d
 decreasing_by simp_wf; exact this.right
 
-/- We define f⁻¹ := f when f is not invertible, so that (f⁻¹)⁻¹ = f -/
-/- TODO: the `if` means `invertible f` needs to be decidable, even if the user supplies a proof -/
+@[simp]
+theorem invFun_map_zero : f.invFun 0 = 0 := rfl
+
+@[simp]
+theorem invFun_map_one : f.invFun 1 = f.inv_leading := rfl
+
+theorem invFun_map {n : ℕ} : f.invFun n = if n = 0 then 0 else if n = 1 then f.inv_leading else
+    -f.inv_leading * ∑ d in n.properDivisors, f (n / d) * f.invFun d := by
+  split_ifs with hn₀ hn₁
+  · subst hn₀; rfl
+  · subst hn₁; rfl
+  · simp [invFun, sum_attach _ fun x ↦ f (n / x) * f.invFun x]
+
 noncomputable instance : Inv (ArithmeticFunction R) where
-  inv := fun f ↦ if invertible f then ⟨f.invFun, rfl⟩ else f
+  inv := fun f ↦ ⟨f.invFun, rfl⟩
 
 @[simp]
-theorem inv_def : f⁻¹ = if invertible f then ⟨f.invFun, rfl⟩ else f := by rfl
+theorem inv_def : f⁻¹ = ⟨f.invFun, rfl⟩ := by rfl
 
-@[simp]
-theorem inv_def_invertible (hf : invertible f) : f⁻¹ = ⟨f.invFun, rfl⟩ := by simp [hf]
+/- We prove this as early as possible, then use `IsUnit` from here on -/
+/- This is also why we don't mark this as @[simp] -/
+theorem isUnit_iff : IsUnit f ↔ IsUnit (f 1) := by
+  constructor <;> intro hf
+  · obtain ⟨⟨f, f_inv, mul_inv, inv_mul⟩, rfl⟩ := hf
+    have : (f * f_inv) 1 = 1 := by simp [mul_inv]
+    simp [mul_apply, sum_divisorsAntidiagonal (f · * f_inv ·)] at this
+    have : IsUnit (f 1 * f_inv 1) := by rw [this]; exact isUnit_one
+    simp [((Commute.all _ _).isUnit_mul_iff.mp this).left]
+  · have : f * f⁻¹ = 1 := by
+      ext n
+      match n with
+      | 0 => simp
+      | 1 => simp [inv_leading, inv_def, hf]
+      | .succ (.succ n) =>
+        rw [mul_apply, sum_divisorsAntidiagonal' (f · * f⁻¹ ·), ← cons_self_properDivisors,
+          Finset.sum_cons, Nat.div_self, f.inv_def, coe_mk, invFun, ← mul_assoc, mul_neg,
+          sum_attach (n + 2).properDivisors fun d ↦ f (_ / d) * f.invFun d]
+        all_goals simp [inv_leading, hf]
+    exact ⟨⟨f, f⁻¹, this, (mul_comm _ _).trans this⟩, by rfl⟩
 
+instance [Decidable (IsUnit (f 1))] : Decidable (IsUnit f) := by rw [isUnit_iff]; infer_instance
+
+/- We mark this as simp instead of inv_leading_def because IsUnit is more useful -/
 @[simp]
-theorem inv_def_not_invertible (hf : ¬invertible f) : f⁻¹ = f := by simp [hf]
+theorem inv_leading_def' (f : ArithmeticFunction R) :
+    f.inv_leading = if hf : IsUnit f then (((isUnit_iff.mp hf).unit⁻¹ : Rˣ) : R) else 0 := by
+  simp_rw [isUnit_iff]
+  rfl
+
+/- We duplicate lemmas from above to use IsUnit instead -/
+theorem inv_leading_isUnit' (hf : IsUnit f) : f.inv_leading = (isUnit_iff.mp hf).unit⁻¹ := by
+  simp [inv_leading, hf]
+
+theorem inv_leading_not_isUnit' (hf : ¬IsUnit f) : f.inv_leading = 0 := by
+  simp [inv_leading, hf]
+
 
 end defining_inverse
 
 /- ------------------------------------------------------------ -/
 
-section invertibility_lemmas
-
-open Nat Finset BigOperators
-
-variable {f g : ArithmeticFunction R} [DecidablePred (@invertible R hR)]
-
-theorem invertible_inv_iff : invertible f ↔ invertible f⁻¹ := by
-  constructor
-  · intro h
-    have h' := h
-    simp [invertible] at h ⊢
-    simp [h, h']
-  · contrapose!
-    intro h
-    simp [invertible] at h ⊢
-    simp [h]
-
-theorem invertible_mul_iff : invertible f ∧ invertible g ↔ invertible (f * g) := by
-  constructor
-  all_goals intro h; simp [invertible] at h ⊢; exact h
-
-end invertibility_lemmas
-
-/- ------------------------------------------------------------ -/
-
-/- Everything here applies for only invertible ArithmeticFunction -/
 section invertible_lemmas
 
-variable {f : ArithmeticFunction R} [DecidablePred (@invertible R hR)] (hf : f.invertible)
+variable {f : ArithmeticFunction R} (hf : IsUnit f)
 
 open Nat Finset BigOperators ArithmeticFunction
 
@@ -151,65 +167,33 @@ theorem inv_map_one : f⁻¹ 1 = f.inv_leading := by simp [hf]
 theorem inv_map_two_le {n : ℕ} (hn : 2 ≤ n) :
     f⁻¹ n = -f.inv_leading * ∑ d in n.properDivisors, f (n / d) * f⁻¹ d := by
   simp [hf]
-  rw [invFun, sum_attach _ fun x ↦ f (n / x) * f.invFun x, inv_leading_eq_inv, neg_mul]
+  rw [invFun, sum_attach _ fun x ↦ f (n / x) * f.invFun x, neg_mul, inv_leading_isUnit]
   all_goals intro hn'; subst hn'; trivial
 
-theorem inv_map {n : ℕ} : f⁻¹ n = if n = 0 then 0 else if n = 1 then f.inv_leading else
-    -f.inv_leading * ∑ d in n.properDivisors, f (n / d) * f⁻¹ d := by
-  split_ifs with hn₀ hn₁
-  · subst hn₀; simp [hf]
-  · subst hn₁; simp [hf]
-  · simp [hf, sum_attach _ fun x ↦ f (n / x) * f.invFun x]
 
 theorem inv_map_def_two_le {n : ℕ} (hn : 2 ≤ n) :
     ∑ d in n.divisors, f (n / d) * f⁻¹ d = 0 := by
   rw [← cons_self_properDivisors, Finset.sum_cons, Nat.div_self, f.inv_map_two_le hf hn,
-    ← mul_assoc, mul_neg, map_one_mul_inv_leading hf, neg_one_mul, add_left_neg]
+    ← mul_assoc, mul_neg]
+  simp [inv_leading_isUnit', hf]
   all_goals omega
 
 @[simp]
-theorem mul_inv : f * f⁻¹ = 1 := by
-  ext n
-  by_cases hn₀ : n = 0
-  · subst hn₀; rfl
-  · rw [mul_apply, sum_divisorsAntidiagonal' (f · * f⁻¹ ·), ← cons_self_properDivisors,
-      Finset.sum_cons, Nat.div_self, f.inv_map hf]
-    simp only [hn₀, if_false]
-    split_ifs with hn₁
-    · subst hn₁; simp [hf]
-    · simp [hf, ← mul_assoc, one_apply, hn₁]
-    all_goals omega
-
-@[simp]
-theorem inv_mul : f⁻¹ * f = 1 := (mul_comm _ _).trans $ f.mul_inv hf
-
-/- This is to help prove that a defined function *is* an inverse -/
-theorem inv_eq_iff {g : ArithmeticFunction R} : f⁻¹ = g ↔ f * g = 1 := by
-  constructor <;> intro h
-  · rw [← h, mul_inv hf]
-  · apply_fun (f⁻¹ * ·) at h
-    rwa [mul_one, ← mul_assoc, inv_mul hf, one_mul, eq_comm] at h
-
-@[simp]
 /- How to name this -/
-theorem inv_mul_inv_invertible {g : ArithmeticFunction R} (hg : invertible g) :
+theorem inv_mul_inv_invertible {g : ArithmeticFunction R} :
     (f * g)⁻¹ = f⁻¹ * g⁻¹ := by
-  rw [inv_eq_iff $ invertible_mul_iff.mp ⟨hf, hg⟩, ← mul_assoc, mul_assoc f, mul_comm g,
-    ← mul_assoc, mul_inv hf, one_mul, mul_inv hg]
-
-noncomputable def mkUnit : (ArithmeticFunction R)ˣ :=
-  ⟨f, f⁻¹, f.mul_inv hf, f.inv_mul hf⟩
-
-theorem mkUnit_inv_eq_inv : (f.mkUnit hf)⁻¹ = f⁻¹ := rfl
+  sorry
 
 end invertible_lemmas
 
+/- ------------------------------------------------------------ -/
+/- ----------------EVERYTHING BELOW IS NOT FIXED--------------- -/
 /- ------------------------------------------------------------ -/
 
 /- Everything here applies for any ArithmeticFunction -/
 section general_lemmas
 
-variable {f : ArithmeticFunction R} [DecidablePred (@invertible R hR)]
+variable {f : ArithmeticFunction R} [DecidablePred (@IsUnit R _)]
 
 open Nat Finset BigOperators ArithmeticFunction
 
@@ -237,7 +221,7 @@ section section_dedicated_to_Yael
 
 open Nat ArithmeticFunction
 
-variable [DecidablePred (@invertible R hR)]
+variable [DecidablePred (@IsUnit R _)]
 
 /- Proving Yaël's bonus point, which is False as stated -/
 instance : DivisionMonoid (ArithmeticFunction R) where
@@ -267,8 +251,8 @@ variable (f : ArithmeticFunction R)
 
 namespace IsMultiplicative
 
-theorem invertible (hf : IsMultiplicative f) : invertible f := by
-  simp [ArithmeticFunction.invertible, hf.map_one]
+theorem isUnit (hf : IsMultiplicative f) : IsUnit f := by
+  rw [isUnit_iff]
 
 /- This fails because of the TODO above -/
 def mkUnit (hf' : IsMultiplicative f) : (ArithmeticFunction R)ˣ :=
