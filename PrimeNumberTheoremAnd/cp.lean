@@ -4,14 +4,10 @@ import Mathlib.NumberTheory.VonMangoldt
 
 set_option autoImplicit false
 
-section aux
+open Nat hiding log
+open BigOperators Squarefree ArithmeticFunction Finset IsPrimePow
 
-namespace Nat
-namespace Coprime
-
-open Finset
-
-def mul_divisors_equiv {m n : ℕ} (h : m.Coprime n) (hm : m ≠ 0) (hn : n ≠ 0) :
+def Nat.Coprime.mul_divisors_equiv {m n : ℕ} (h : m.Coprime n) (hm : m ≠ 0) (hn : n ≠ 0) :
     (m * n).divisors ≃ m.divisors ×ˢ n.divisors where
   toFun := fun ⟨d, _⟩ ↦ by
     /- A nicer to work with version of `prod_dvd_and_dvd_of_dvd_prod` -/
@@ -34,19 +30,6 @@ def mul_divisors_equiv {m n : ℕ} (h : m.Coprime n) (hm : m ≠ 0) (hn : n ≠ 
       rw [gcd_eq_right hm', h.coprime_dvd_right hn', mul_one]
     · rw [gcd_comm, Coprime.gcd_mul _ this]
       rw [h.symm.coprime_dvd_right hm', gcd_eq_right hn', one_mul]
-
-theorem mul_divisors_equiv_prop {m n d} (h : Coprime m n) (hm hn) :
-    (mul_divisors_equiv h hm hn d).val.fst * (mul_divisors_equiv h hm hn d).val.snd = d := by
-  nth_rw 3 [← (mul_divisors_equiv h hm hn).left_inv d]
-  rfl
-
-end Coprime
-end Nat
-
-section actualStuff
-
-open Nat hiding log
-open BigOperators Squarefree ArithmeticFunction Finset IsPrimePow
 
 theorem IsPrimePow.eq_of_dvd_dvd {p q n : ℕ}
     (hn : IsPrimePow n) (hp' : p.Prime) (hq' : q.Prime) (hp : p ∣ n) (hq : q ∣ n) : p = q := by
@@ -120,196 +103,91 @@ lemma IsPrimePow.isPrimePow_mul_asdf {a b : ℕ}
     contrapose! this
     rw [nonpos_iff_eq_zero.mp this, Nat.pow_zero]
 
-set_option push_neg.use_distrib true
-example {n : ℕ} : (μ * Λ) n = -μ n * log n := by
-  /- case on n = 0 -/
-  rcases Nat.eq_zero_or_pos n with rfl | hn₀
-  · simp only [ArithmeticFunction.map_zero, mul_zero]
-  /- remaining case -/
-  by_cases hn : Squarefree n
-  · have h_id₁ {d : ℕ} (hd : d ∈ n.divisors) : μ n = μ d * μ (n / d) := by
-      have := Nat.mul_div_cancel' $ dvd_of_mem_divisors hd
-      rw [← (isMultiplicative_moebius).right, this]
-      exact Nat.coprime_of_squarefree_mul (this.symm ▸ hn)
-    have h_id₂ {d : ℕ} (hd : d ∈ n.divisors) : μ d * Λ d = -Λ d := by
-      by_cases hd : IsPrimePow d
-      · obtain ⟨p, k, ⟨hp, hd'⟩⟩ := hd
-        rw [← Nat.prime_iff] at hp
-        rw [← hd'.right, moebius_apply_prime_pow hp $ Nat.pos_iff_ne_zero.mp hd'.left]
-        split_ifs with hk
-        · norm_num
-        · have : Squarefree _ := hd'.right.symm ▸ squarefree_of_dvd (dvd_of_mem_divisors hd) hn
-          have : k = 0 ∨ k = 1 := eq_zero_or_one_of_pow_of_not_isUnit this hp.not_unit
-          omega
-      · simp only [vonMangoldt_apply, hd, if_false, mul_zero, neg_zero]
-    symm
-    rw [neg_mul, neg_eq_iff_eq_neg]
-    /- My first long calc proof! -/
-    calc μ n * log n
-      _ = ∑ d in n.divisors, Λ d * μ n := by
-        rw [← sum_mul, vonMangoldt_sum, mul_comm] ; rfl
-      _ = ∑ d in n.divisors, Λ (n / d) * μ n := by
-        rw [← sum_div_divisors]
-      _ = ∑ d in n.divisors, Λ (n / d) * μ (n / d) * μ d := by
-        refine sum_congr rfl (fun d hd ↦ ?_)
-        rw [h_id₁ hd, mul_assoc, mul_comm (μ d)]
-        norm_cast
-      _ = -∑ d in n.divisors, Λ (n / d) * μ d := by
-        rw [← sum_neg_distrib]
-        refine sum_congr rfl (fun d hd ↦ ?_)
-        have hd' : n / d ∈ n.divisors := by
-          rw [mem_divisors] at hd ⊢
-          exact ⟨div_dvd_of_dvd hd.left, hd.right⟩
-        rw [mul_comm (Λ _), h_id₂ hd', neg_mul]
-      _ = -∑ d in n.divisors, μ d * Λ (n / d) := by
-        simp_rw [mul_comm]
-      _ = -(μ * Λ) n := by
-        rw [mul_apply, ← map_div_right_divisors, sum_map, Function.Embedding.coeFn_mk]
-        rfl
-  · simp only [mul_apply, ← map_div_right_divisors, sum_map, Function.Embedding.coeFn_mk]
-    rw [moebius_eq_zero_of_not_squarefree hn, Int.cast_zero, neg_zero, zero_mul]
-    trans ∑ d in n.divisors.filter fun d ↦ IsPrimePow d ∧ Squarefree (n / d), Λ d * μ (n / d)
-    · rw [← sum_div_divisors]
-      rw [sum_congr rfl (g := fun d ↦ Λ d * μ (n / d)) (fun d hd ↦ by
-        rw [Nat.div_div_self ?_ hn₀.ne.symm, mul_comm]
-        rfl; exact (mem_divisors.mp hd).left
-      )]
-      rw [← sum_filter_ne_zero]
-      refine sum_congr ?_ (fun _ _ ↦ rfl)
-      congr ; ext d
-      rw [mul_ne_zero_iff]
-      simp [moebius_ne_zero_iff_squarefree, vonMangoldt_eq_zero_iff]
-    · obtain ⟨a, b, ha, hb, rfl, ha'⟩ := sq_mul_squarefree_of_pos hn₀
-      replace hb : 1 < b := by
-        contrapose! hn
-        rcases (show b = 1 by omega) with rfl
-        rwa [one_pow, one_mul]
-      clear hn
-      by_cases hb' : IsPrimePow b
-      · obtain ⟨p, k, hp_prime, hk_pos, rfl⟩ := hb'
-        rw [← prime_iff] at hp_prime
-        have : ∃ k' a',
-            (p ^ k) ^ 2 * a = p ^ k'.succ * a' ∧ 1 ≤ k' ∧ Coprime p a' ∧ Squarefree a' := by
-          use 2 * k + a.factorization p - 1, ord_compl[p] a, ?_, by omega, ?_
-          · exact ha'.squarefree_of_dvd $ ord_compl_dvd a p
-          · rw [succ_eq_add_one, Nat.sub_add_cancel (by omega), pow_add, mul_assoc,
-              ord_proj_mul_ord_compl_eq_self]
-            ring_nf
-          · exact coprime_ord_compl hp_prime ha.ne.symm
-        obtain ⟨k, a, hhhh, hk_one_le, ha_coprime, ha_sqf⟩ := this
-        simp only [hhhh] at *; clear hhhh
-        have ha_coprime' := ha_coprime.pow_left k.succ
-        have ha_dvd : ¬p ∣ a := by
-          contrapose! ha_coprime
-          obtain ⟨k, rfl⟩ := ha_coprime
-          simp [hp_prime.ne_one]
-        have : ∀ d ∈ (p ^ k.succ * a).divisors.filter fun d ↦
-            IsPrimePow d ∧ Squarefree (p ^ k.succ * a / d), p ^ k ∣ d := by
-          intro d hd
-          obtain ⟨hd, hd_pp, hd_sqf⟩ := mem_filter.mp hd
-          obtain ⟨hd_dvd, hd_ne_zero⟩ := mem_divisors.mp hd
-          obtain ⟨q, k', hq_prime, hk'_pos, rfl⟩ := hd_pp
-          rw [← prime_iff] at hq_prime
-          have : p = q := by
-            have hdvd_pow {x : ℕ} := dvd_pow (dvd_rfl (a := x)) hk'_pos.ne.symm
-            have hq_dvd := hq_prime.dvd_mul.mp $ hdvd_pow.trans hd_dvd
-            cases' hq_dvd with hq_dvd hq_dvd
-            · refine ((Nat.prime_dvd_prime_iff_eq hq_prime hp_prime).mp ?_).symm
-              exact hq_prime.dvd_of_dvd_pow hq_dvd
-            · have : ¬p ∣ q := by
-                contrapose! ha_coprime with hpq
-                obtain ⟨k, rfl⟩ := hpq.trans hq_dvd
-                simp [hp_prime.ne_one]
-              have : p ^ k.succ ∣ p ^ k.succ * a / q ^ k' := by
-                rw [Nat.mul_div_assoc]
-                · apply dvd_mul_right
-                · have h' := pow hq_prime.isPrimePow hk'_pos.ne.symm
-                  have h' := (ha_coprime'.isPrimePow_dvd_mul h').mp hd_dvd
-                  cases' h' with h'
-                  · exfalso
-                    replace h' := hq_prime.dvd_of_dvd_pow $ hdvd_pow.trans h'
-                    replace h' := (Nat.prime_dvd_prime_iff_eq hq_prime hp_prime).mp h'
-                    exact (Nat.prime_dvd_prime_iff_eq hp_prime hq_prime).not.mp this h'.symm
-                  · assumption
-              absurd hd_sqf
-              simp [Squarefree]
-              use p, (sq p ▸ pow_dvd_pow _ (show 2 ≤ k.succ by omega)).trans this, hp_prime.ne_one
-          subst this
-          rw [pow_dvd_pow_iff_le_right hp_prime.one_lt]
-          have hd_fact := hd_sqf.natFactorization_le_one p
-          have h := mul_ne_zero_iff.mp hd_ne_zero
-          rw [Nat.factorization_div hd_dvd, Nat.factorization_mul h.left h.right] at hd_fact
-          simp [hp_prime.factorization_self, factorization_eq_zero_of_not_dvd ha_dvd] at hd_fact
-          omega
-        have : (p ^ k.succ * a).divisors.filter (fun d ↦
-            IsPrimePow d ∧ Squarefree (p ^ k.succ * a / d)) = ({p ^ k, p ^ k.succ} : Finset ℕ) := by
-          ext d
-          constructor <;> intro hd
-          · have hd₁ := this d hd
-            rw [mem_filter, mem_divisors] at hd
-            have hd₂ : d ∣ p ^ k.succ := by
-              have := (dvd_pow dvd_rfl (by omega)).trans hd₁
-              have := fun h'' ↦ ha_dvd $ this.trans h''
-              have := (ha_coprime'.isPrimePow_dvd_mul hd.right.left).mp hd.left.left
-              tauto
-            obtain ⟨k', rfl⟩ := hd₁
-            have : k' ∣ p := by
-              convert dvd_div_of_mul_dvd hd₂
-              rw [Nat.pow_div _ hp_prime.pos, succ_sub, Nat.sub_self, pow_one]
-              all_goals omega
-            have : k' = 1 ∨ k' = p := (dvd_prime hp_prime).mp this
-            rcases this with rfl | rfl
-            · simp
-            · have : succ (k - 1) = k := by omega
-              simp [← Nat.pow_succ, this]
-          · simp at hd ⊢
-            rcases hd with rfl | rfl
-            <;> simp [hp_prime.ne_zero, (mul_ne_zero_iff.mp hn₀.ne.symm).right]
-            · simp [Nat.pow_succ, mul_assoc, dvd_mul_right]
-              constructor
-              · use p, k, prime_iff.mp hp_prime, hk_one_le
-              · rw [mul_div_right]
-                · exact (squarefree_mul ha_coprime).mpr ⟨hp_prime.squarefree, ha_sqf⟩
-                · exact pow_pos hp_prime.pos _
-            · constructor
-              · use p, k.succ, prime_iff.mp hp_prime, succ_pos _
-              · rwa [mul_div_right]
-                exact pow_pos hp_prime.pos _
-        rw [this, sum_insert, sum_singleton, vonMangoldt_apply_pow, vonMangoldt_apply_pow]
-        · save
-          rw [Nat.mul_div_cancel_left, Nat.pow_succ, mul_assoc, Nat.mul_div_cancel_left]
-          · rw [isMultiplicative_moebius.map_mul_of_coprime ha_coprime,
-              moebius_apply_prime hp_prime]
-            simp
-          · exact pow_pos hp_prime.pos _
-          · exact pow_pos hp_prime.pos _
-        · simp
-        · omega
-        · simp
-          have := Nat.pow_right_injective hp_prime.two_le
-          specialize @this k k.succ
-          simpa [(Nat.succ_ne_self k).symm, this]
-      · /- It suffices to prove the filtered set is empty -/
-        apply sum_congr (s₂ := ∅) ?_ fun _ _ ↦ rfl
-        ext d
-        simp [not_or]
-        obtain ⟨p, q, hp_prime, hq_prime, hpq, hp_dvd, hq_dvd⟩ :=
-          (not_isPrimePow_iff_exists_primes_dvd hb).mp hb'
-        /- If p^2q^2 | b, then b / d cannot be a prime power for a squarefree d -/
-        intro hd_dvd hb_zero ha_zero hd_pp h_sqf
-        have hp₁ : 2 ≤ (b ^ 2 * a).factorization p := by
-          rw [Nat.factorization_mul (pow_ne_zero _ hb_zero) ha_zero, Nat.factorization_pow]
-          simp
-          have := (hp_prime.dvd_iff_one_le_factorization hb_zero).mp hp_dvd
-          omega
-        have hq₁ : 2 ≤ (b ^ 2 * a).factorization q := by
-          rw [Nat.factorization_mul (pow_ne_zero _ hb_zero) ha_zero, Nat.factorization_pow]
-          simp
-          have := (hq_prime.dvd_iff_one_le_factorization hb_zero).mp hq_dvd
-          omega
-        have hp₂ : (b ^ 2 * a / d).factorization p ≤ 1 := h_sqf.natFactorization_le_one p
-        have hq₂ : (b ^ 2 * a / d).factorization q ≤ 1 := h_sqf.natFactorization_le_one q
-        simp [factorization_div hd_dvd] at hp₂ hq₂
-        have hp_dvd' := (hp_prime.dvd_iff_one_le_factorization hd_pp.ne_zero).mpr (by linarith)
-        have hq_dvd' := (hq_prime.dvd_iff_one_le_factorization hd_pp.ne_zero).mpr (by linarith)
-        exact hpq $ hd_pp.eq_of_dvd_dvd hp_prime hq_prime hp_dvd' hq_dvd'
+
+lemma ArithmeticFunction.mul_prime_pow_apply {R : Type*} [Semiring R]
+    (f g : ArithmeticFunction R) (p : ℕ) (hp : p.Prime) (n : ℕ) :
+    (f * g) (p ^ n) = ∑ k in Finset.Icc 0 n, f (p ^ k) * g (p ^ (n - k)) := by
+  simp [sum_divisorsAntidiagonal (f · * g ·), divisors_prime_pow hp]
+  rw [range_eq_Ico, Ico_succ_right]
+  exact sum_congr rfl fun d hd ↦ by rw [Nat.pow_div (mem_Icc.mp hd).right hp.pos]
+
+lemma Nat.Coprime.divisors_inter_eq {m n : ℕ} (hmn : m.Coprime n) (hm : m ≠ 0) (hn : n ≠ 0) :
+    m.divisors ∩ n.divisors = {1} := by
+  ext d
+  simp only [mem_inter, mem_divisors, ne_eq, mem_singleton]
+  constructor
+  · rintro ⟨⟨hdm, _⟩, hdn, _⟩
+    exact Nat.eq_one_of_dvd_coprimes hmn hdm hdn
+  · rintro rfl
+    exact ⟨⟨one_dvd _, hm⟩, ⟨one_dvd _, hn⟩⟩
+
+lemma not_isPrimePow {m n d : ℕ} (hmn : m.Coprime n) (hd : d ∣ m * n) (hdm : ¬d ∣ m) (hdn : ¬d ∣ n) :
+    ¬IsPrimePow d := by
+  by_contra! hd_pp
+  obtain ⟨p, k, hp_prime, hk_pos, rfl⟩ := hd_pp
+  rw [← prime_iff] at hp_prime
+  have hm : m ≠ 0 := by contrapose! hdm; subst hdm; exact dvd_zero _
+  have hn : n ≠ 0 := by contrapose! hdn; subst hdn; exact dvd_zero _
+  rw [hp_prime.pow_dvd_iff_le_factorization] at hdm hdn <;> try assumption
+  have h : m.factorization p = 0 ∨ n.factorization p = 0 := by
+    by_contra!
+    have : p ∣ m.gcd n := dvd_gcd_iff.mpr ⟨?_, ?_⟩
+    rw [hmn, dvd_one] at this
+    exact hp_prime.ne_one this
+    all_goals apply dvd_of_factorization_pos; tauto
+  rw [hp_prime.pow_dvd_iff_le_factorization $ mul_ne_zero_iff.mpr ⟨hm, hn⟩,
+    Nat.factorization_mul hm hn, Finsupp.coe_add, Pi.add_apply] at hd
+  cases h <;> linarith
+
+example {n : ℕ} : (Λ * μ) n = -μ n * log n := by
+  induction n using Nat.recOnPosPrimePosCoprime with
+  | hp p n hp_prime hn_pos =>
+    simp_rw [mul_comm Λ _, mul_prime_pow_apply _ _ _ hp_prime, intCoe_apply]
+    by_cases hn : n = 1
+    · simp [show Icc 0 1 = {0, 1} by rfl, hn, Nat.div_self hp_prime.pos,
+        moebius_apply_prime hp_prime, vonMangoldt_apply_prime hp_prime]
+    · trans ∑ x in Finset.range 2, μ (p ^ x) * Λ (p ^ (n - x))
+      · refine (sum_subset (fun d hd ↦ ?_) fun d _ hd ↦ ?_).symm
+        · simp at hd ⊢; omega
+        · have : 2 ≤ d := le_of_not_lt $ mem_range.not.mp hd
+          rw [moebius_apply_prime_pow hp_prime (by omega)]
+          simp [show d ≠ 1 by omega]
+      · simp [sum_range, moebius_apply_prime hp_prime]
+        rw [vonMangoldt_apply_pow, vonMangoldt_apply_pow, add_neg_self,
+          moebius_apply_prime_pow hp_prime]
+        all_goals simp [hn]; try omega
+  | h0 => simp
+  | h1 => simp
+  | h a b ha hb hab ha' hb' =>
+    have ha₀ : a ≠ 0 := by omega
+    have hb₀ : b ≠ 0 := by omega
+    calc (Λ * μ) (a * b)
+    _ = ∑ d in (a * b).divisors, Λ d * μ (a * b / d) := by
+      erw [mul_apply, sum_divisorsAntidiagonal (Λ · * μ ·)]
+    _ = ∑ d in a.divisors ∪ b.divisors, Λ d * μ (a * b / d)
+        + ∑ d in a.divisors ∩ b.divisors, Λ d * μ (a * b / d) := by
+      simp [hab.divisors_inter_eq ha₀ hb₀]
+      refine (sum_subset ?_ fun d hd hd' ↦ ?_).symm
+      · apply union_subset <;> apply divisors_subset_of_dvd (mul_ne_zero ha₀ hb₀) (by simp)
+      · simp [mem_divisors] at hd hd'
+        apply mul_eq_zero_of_left (vonMangoldt_eq_zero_iff.mpr $ not_isPrimePow hab ?_ ?_ ?_)
+        all_goals tauto
+    _ = μ b * ∑ d in a.divisors, Λ d * μ (a / d) + μ a * ∑ d in b.divisors, Λ d * μ (b / d) := by
+      rw [sum_union_inter, mul_sum, mul_sum]
+      congr 1 <;> apply sum_congr rfl fun d hd ↦ ?_
+      · have hd_dvd := (mem_divisors.mp hd).left
+        rw [mul_comm a b, Nat.mul_div_assoc _ hd_dvd, isMultiplicative_moebius.right, Int.cast_mul]
+        ring_nf
+        exact hab.symm.coprime_dvd_right ⟨d, (Nat.div_mul_cancel hd_dvd).symm⟩
+      · have hd_dvd := (mem_divisors.mp hd).left
+        rw [Nat.mul_div_assoc _ hd_dvd, isMultiplicative_moebius.right, Int.cast_mul]
+        ring_nf
+        exact hab.coprime_dvd_right ⟨d, (Nat.div_mul_cancel hd_dvd).symm⟩
+    _ = μ b * (Λ * μ) a + μ a * (Λ * μ) b := by
+      simp_rw [mul_apply, intCoe_apply, sum_divisorsAntidiagonal (Λ · * μ ·)]
+    _ = -μ (a * b) * log (a * b) := by
+      rw [ha', hb', ← mul_assoc, ← mul_assoc, mul_neg, mul_neg,
+        isMultiplicative_moebius.right hab, mul_comm (μ b : ℝ) (μ a : ℝ), ← mul_add,
+        @log_apply (a * b), cast_mul, Real.log_mul]
+      norm_cast
+      all_goals exact cast_ne_zero.mpr (by omega)
